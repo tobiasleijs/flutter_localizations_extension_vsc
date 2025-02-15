@@ -2,7 +2,7 @@
   "name": "flutter-localizations",
   "displayName": "Flutter Localizations",
   "description": "An extension that helps you order and generate new localizations for Flutter",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "engines": {
     "vscode": "^1.97.0"
   },
@@ -14,8 +14,8 @@
   "contributes": {
     "commands": [
       {
-        "command": "flutter-localizations.helloWorld",
-        "title": "Hello World"
+        "command": "flutter_localizations.createLocalization",
+        "title": "Iconica: Add Flutter Localization"
       }
     ]
   },
