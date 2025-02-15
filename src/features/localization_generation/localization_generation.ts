@@ -28,7 +28,7 @@ export const localizationGenerationProvider = vscode.commands.registerCommand("f
     }
 });
 
-function preQueryCheck() {
+export function preQueryCheck() {
     const rootFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
     if (!rootFolder) {
         throw new Error("Workspace folder not found");
@@ -175,12 +175,14 @@ function addAndSaveLocalizations(
     }
 }
 
-function formatLocalizationFile(file: string) {
+export function formatLocalizationFile(file: string) {
+    const json = JSON.parse(file);
+    const jsonString = JSON.stringify(json, null, 2);
     const splitValue = "\"@_";
-    const splitFile = file.split(splitValue);
+    const splitFile = jsonString.split(splitValue);
 
     if (splitFile.length < 2) {
-        return file;
+        return jsonString;
     }
 
     const firstSection = splitFile[0] + splitValue + splitFile[1];

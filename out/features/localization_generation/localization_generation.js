@@ -34,6 +34,8 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.localizationGenerationProvider = void 0;
+exports.preQueryCheck = preQueryCheck;
+exports.formatLocalizationFile = formatLocalizationFile;
 const vscode = __importStar(require("vscode"));
 const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
@@ -153,10 +155,12 @@ function addAndSaveLocalizations(localizationMap, localizationsFolder, section, 
     }
 }
 function formatLocalizationFile(file) {
+    const json = JSON.parse(file);
+    const jsonString = JSON.stringify(json, null, 2);
     const splitValue = "\"@_";
-    const splitFile = file.split(splitValue);
+    const splitFile = jsonString.split(splitValue);
     if (splitFile.length < 2) {
-        return file;
+        return jsonString;
     }
     const firstSection = splitFile[0] + splitValue + splitFile[1];
     const remainingSections = splitFile.slice(2).map(section => "\n\n" + splitValue + section);

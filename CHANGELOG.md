@@ -2,6 +2,13 @@
 
 All notable changes to the "flutter-localizations" extension will be documented in this file.
 
+## [0.2.0] - 2025-02-15
+
+### Added
+
+- Added the `Flutter Localizations: Sort Flutter Localizations` command to sort localization entries within each section alphabetically and ensure that sections are also sorted alphabetically.
+
+
 ## [0.1.0] - 2025-02-15
 
 ### Added
