@@ -2,14 +2,16 @@
   "name": "flutter-localizations",
   "displayName": "Flutter Localizations",
   "description": "An extension that helps you order and generate new localizations for Flutter",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "engines": {
     "vscode": "^1.97.0"
   },
   "categories": [
     "Other"
   ],
-  "activationEvents": [],
+  "activationEvents": [
+    "workspaceContains:**/*.arb"
+  ],
   "main": "./out/extension.js",
   "contributes": {
     "commands": [

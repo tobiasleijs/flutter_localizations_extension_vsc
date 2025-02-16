@@ -2,6 +2,15 @@
 
 All notable changes to the "flutter-localizations" extension will be documented in this file.
 
+## [0.4.0] - 2025-02-16
+
+### Added
+
+- Automatically diagnose and highlight unused localization keys in your Flutter project.
+- Continuously analyzes your localization files and Dart files.
+- Highlights any unused localization keys with a warning message.
+
+
 ## [0.3.0] - 2025-02-16
 
 ### Added
