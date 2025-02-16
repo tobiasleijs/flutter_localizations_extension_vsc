@@ -2,7 +2,7 @@
   "name": "flutter-localizations",
   "displayName": "Flutter Localizations",
   "description": "An extension that helps you order and generate new localizations for Flutter",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "engines": {
     "vscode": "^1.97.0"
   },
@@ -20,6 +20,10 @@
       {
         "command": "flutter_localizations.sortLocalizations",
         "title": "Iconica: Sort Flutter Localizations"
+      },
+      {
+        "command": "flutterLocalizationSearch.findLocalization",
+        "title": "Iconica: Find Flutter Localization"
       }
     ]
   },

@@ -29,3 +29,15 @@ The extension provides a command to sort localizations in your Flutter project. 
 2. Run the command `Flutter Localizations: Sort Flutter Localizations`.
 
 The extension will automatically sort your localization files and format them accordingly.
+
+### Localization Search
+
+The extension provides a command to search for localization keys and values in your Flutter project. It allows you to find all instances of a localization key or value in your Dart files.
+
+#### How to Use
+
+1. Open the command palette (`Cmd+Shift+P` on macOS or `Ctrl+Shift+P` on Windows/Linux).
+2. Run the command `Iconica: Find Flutter Localization`.
+3. Enter the localized string or key to search for.
+
+The extension will search for the specified key or value in your localization files and Dart files, and display the results.

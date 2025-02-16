@@ -2,6 +2,11 @@
 
 All notable changes to the "flutter-localizations" extension will be documented in this file.
 
+## [0.3.0] - 2025-02-16
+
+### Added
+- Added a new feature to search for localized strings or keys within the project. Use the command `Iconica: Find Flutter Localization` to initiate the search.
+
 ## [0.2.0] - 2025-02-15
 
 ### Added
