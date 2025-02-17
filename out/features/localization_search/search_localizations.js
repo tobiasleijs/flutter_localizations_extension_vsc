@@ -42,15 +42,15 @@ exports.localizationFinder = vscode.commands.registerCommand("flutterLocalizatio
     if (!searchString) {
         return;
     }
+    ;
     const lowerCaseSearchString = searchString.toLowerCase();
     const workspaceFolders = vscode.workspace.workspaceFolders;
     if (!workspaceFolders) {
         vscode.window.showErrorMessage("No workspace open.");
         return;
     }
-    const localizationKeys = new Map();
-    await findLocalizationKeys(localizationKeys);
-    let matchedKeys = [...localizationKeys.entries()].filter(([key, values]) => key.toLowerCase().includes(lowerCaseSearchString) ||
+    const localizationKeys = await findLocalizationKeys();
+    const matchedKeys = [...localizationKeys.entries()].filter(([key, values]) => key.toLowerCase().includes(lowerCaseSearchString) ||
         values.some(value => value.toLowerCase().includes(lowerCaseSearchString)));
     if (matchedKeys.length === 0) {
         vscode.window.showInformationMessage("No matching localization key found.");
@@ -58,11 +58,12 @@ exports.localizationFinder = vscode.commands.registerCommand("flutterLocalizatio
     }
     await findKeyUsagesForMultipleKeys(matchedKeys.map(([key]) => key), searchString);
 });
-async function findLocalizationKeys(localizationKeys) {
-    const files = await vscode.workspace.findFiles("**/lib/src/localization/*.arb");
-    for (const file of files) {
-        const document = await vscode.workspace.openTextDocument(file);
-        const text = document.getText();
+async function findLocalizationKeys() {
+    const files = await vscode.workspace.findFiles("**/*.arb");
+    const localizationKeys = new Map();
+    await Promise.all(files.map(async (file) => {
+        const textBytes = await vscode.workspace.fs.readFile(file);
+        const text = new TextDecoder("utf-8").decode(textBytes);
         const matches = text.matchAll(/"(.*?)"\s*:\s*"(.*?)"/gi);
         for (const match of matches) {
             const key = match[1];
@@ -72,17 +73,21 @@ async function findLocalizationKeys(localizationKeys) {
             }
             localizationKeys.get(key)?.push(value);
         }
-    }
+    }));
+    return localizationKeys;
 }
 async function findKeyUsagesForMultipleKeys(keys, searchString) {
     const occurrences = [];
     const files = await vscode.workspace.findFiles("**/*.dart");
-    for (const file of files) {
-        const document = await vscode.workspace.openTextDocument(file);
-        const text = document.getText();
+    const regexMap = new Map();
+    for (const key of keys) {
+        regexMap.set(key, new RegExp(`\\.${key}\\b`, "g"));
+    }
+    await Promise.all(files.map(async (file) => {
+        const textBytes = await vscode.workspace.fs.readFile(file);
+        const text = new TextDecoder("utf-8").decode(textBytes);
         const lines = text.split("\n");
-        for (const key of keys) {
-            const regex = new RegExp(`\\.${key}`, "g");
+        for (const [key, regex] of regexMap) {
             for (let lineNumber = 0; lineNumber < lines.length; lineNumber++) {
                 let match;
                 while ((match = regex.exec(lines[lineNumber])) !== null) {
@@ -95,7 +100,7 @@ async function findKeyUsagesForMultipleKeys(keys, searchString) {
                 }
             }
         }
-    }
+    }));
     if (occurrences.length === 0) {
         vscode.window.showInformationMessage(`No occurrences found.`);
     }

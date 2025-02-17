@@ -3,13 +3,12 @@ import * as vscode from "vscode";
 export const localizationFinder = vscode.commands.registerCommand(
     "flutterLocalizationSearch.findLocalization",
     async () => {
+
         const searchString = await vscode.window.showInputBox({
             prompt: "Enter the localized string or key to search for",
         });
 
-        if (!searchString) {
-            return;
-        }
+        if (!searchString) { return; };
 
         const lowerCaseSearchString = searchString.toLowerCase();
 
@@ -19,10 +18,9 @@ export const localizationFinder = vscode.commands.registerCommand(
             return;
         }
 
-        const localizationKeys = new Map<string, string[]>();
-        await findLocalizationKeys(localizationKeys);
+        const localizationKeys = await findLocalizationKeys();
 
-        let matchedKeys = [...localizationKeys.entries()].filter(
+        const matchedKeys = [...localizationKeys.entries()].filter(
             ([key, values]) =>
                 key.toLowerCase().includes(lowerCaseSearchString) ||
                 values.some(value => value.toLowerCase().includes(lowerCaseSearchString))
@@ -37,52 +35,60 @@ export const localizationFinder = vscode.commands.registerCommand(
     }
 );
 
+async function findLocalizationKeys(): Promise<Map<string, string[]>> {
+    const files = await vscode.workspace.findFiles("**/*.arb");
+    const localizationKeys = new Map<string, string[]>();
 
-async function findLocalizationKeys(localizationKeys: Map<string, string[]>): Promise<void> {
-    const files = await vscode.workspace.findFiles("**/lib/src/localization/*.arb");
+    await Promise.all(
+        files.map(async file => {
+            const textBytes = await vscode.workspace.fs.readFile(file);
+            const text = new TextDecoder("utf-8").decode(textBytes);
+            const matches = text.matchAll(/"(.*?)"\s*:\s*"(.*?)"/gi);
 
-    for (const file of files) {
-        const document = await vscode.workspace.openTextDocument(file);
-        const text = document.getText();
-        const matches = text.matchAll(/"(.*?)"\s*:\s*"(.*?)"/gi);
-
-        for (const match of matches) {
-            const key = match[1];
-            const value = match[2];
-            if (!localizationKeys.has(key)) {
-                localizationKeys.set(key, []);
+            for (const match of matches) {
+                const key = match[1];
+                const value = match[2];
+                if (!localizationKeys.has(key)) {
+                    localizationKeys.set(key, []);
+                }
+                localizationKeys.get(key)?.push(value);
             }
-            localizationKeys.get(key)?.push(value);
-        }
-    }
+        })
+    );
+
+    return localizationKeys;
 }
 
-
-async function findKeyUsagesForMultipleKeys(keys: string[], searchString : string): Promise<void> {
+async function findKeyUsagesForMultipleKeys(keys: string[], searchString: string): Promise<void> {
     const occurrences: { label: string; fullPath: string; line: number; character: number }[] = [];
     const files = await vscode.workspace.findFiles("**/*.dart");
 
-    for (const file of files) {
-        const document = await vscode.workspace.openTextDocument(file);
-        const text = document.getText();
-        const lines = text.split("\n");
+    const regexMap = new Map<string, RegExp>();
+    for (const key of keys) {
+        regexMap.set(key, new RegExp(`\\.${key}\\b`, "g"));
+    }
 
-        for (const key of keys) {
-            const regex = new RegExp(`\\.${key}`, "g");
+    await Promise.all(
+        files.map(async file => {
+            const textBytes = await vscode.workspace.fs.readFile(file);
+            const text = new TextDecoder("utf-8").decode(textBytes);
+            const lines = text.split("\n");
 
-            for (let lineNumber = 0; lineNumber < lines.length; lineNumber++) {
-                let match;
-                while ((match = regex.exec(lines[lineNumber])) !== null) {
-                    occurrences.push({
-                        label: `${vscode.workspace.asRelativePath(file)}:${lineNumber + 1} (${key})`,
-                        fullPath: file.fsPath,
-                        line: lineNumber,
-                        character: match.index,
-                    });
+            for (const [key, regex] of regexMap) {
+                for (let lineNumber = 0; lineNumber < lines.length; lineNumber++) {
+                    let match;
+                    while ((match = regex.exec(lines[lineNumber])) !== null) {
+                        occurrences.push({
+                            label: `${vscode.workspace.asRelativePath(file)}:${lineNumber + 1} (${key})`,
+                            fullPath: file.fsPath,
+                            line: lineNumber,
+                            character: match.index,
+                        });
+                    }
                 }
             }
-        }
-    }
+        })
+    );
 
     if (occurrences.length === 0) {
         vscode.window.showInformationMessage(`No occurrences found.`);

@@ -3,13 +3,11 @@ import * as vscode from "vscode";
 const diagnosticCollection = vscode.languages.createDiagnosticCollection("unusedLocalizationKeys");
 
 export async function unusedLocalizationDiagnostics() {
-    const workspaceFolders = vscode.workspace.workspaceFolders;
-    if (!workspaceFolders) {
-        return;
-    }
 
-    const localizationKeys = new Map<string, { filePath: string; line: number }[]>();
-    await findLocalizationKeys(localizationKeys);
+    const workspaceFolders = vscode.workspace.workspaceFolders;
+    if (!workspaceFolders) { return; }
+
+    const localizationKeys = await findLocalizationKeys();
 
     const usedKeys = new Set(await findUsedLocalizationKeys([...localizationKeys.keys()]));
 
@@ -17,14 +15,11 @@ export async function unusedLocalizationDiagnostics() {
 
     for (const [key, locations] of localizationKeys.entries()) {
         if (!usedKeys.has(key)) {
-            for (const { filePath, line } of locations) {
+            for (const { filePath, line, startIndex } of locations) {
                 if (!diagnostics[filePath]) {
                     diagnostics[filePath] = [];
                 }
 
-                const document = await vscode.workspace.openTextDocument(filePath);
-                const text = document.lineAt(line).text;
-                const startIndex = text.indexOf(key);
                 const range = new vscode.Range(line, startIndex, line, startIndex + key.length);
                 diagnostics[filePath].push(
                     new vscode.Diagnostic(range, `"Localization ${key} is not used in this project"`, vscode.DiagnosticSeverity.Warning)
@@ -32,52 +27,58 @@ export async function unusedLocalizationDiagnostics() {
             }
         }
     }
-
     diagnosticCollection.clear();
-
     for (const [filePath, diags] of Object.entries(diagnostics)) {
         diagnosticCollection.set(vscode.Uri.file(filePath), diags);
     }
 }
 
-async function findLocalizationKeys(
-    localizationKeys: Map<string, { filePath: string; line: number }[]>
-): Promise<void> {
+async function findLocalizationKeys(): Promise<Map<string, { filePath: string; line: number; startIndex: number }[]>> {
     const files = await vscode.workspace.findFiles("**/*.arb");
+    const localizationKeys = new Map<string, { filePath: string; line: number; startIndex: number }[]>();
 
-    for (const file of files) {
-        const document = await vscode.workspace.openTextDocument(file);
-        const text = document.getText();
-        const lines = text.split("\n");
+    await Promise.all(
+        files.map(async file => {
+            const textBytes = await vscode.workspace.fs.readFile(file);
+            const text = new TextDecoder("utf-8").decode(textBytes);
+            const lines = text.split("\n");
 
-        lines.forEach((line, index) => {
-            const match = line.match(/"(.*?)"\s*:\s*"(.*?)"/);
-            if (match) {
-                const key = match[1];
-                if (!localizationKeys.has(key)) {
-                    localizationKeys.set(key, []);
+            lines.forEach((line, index) => {
+                const match = line.match(/"(.*?)"\s*:\s*"(.*?)"/);
+                if (match) {
+                    const key = match[1];
+                    const startIndex = line.indexOf(`"${key}"`) + 1; // Adjust for the opening quote
+                    if (!localizationKeys.has(key)) {
+                        localizationKeys.set(key, []);
+                    }
+                    localizationKeys.get(key)?.push({ filePath: file.fsPath, line: index, startIndex });
                 }
-                localizationKeys.get(key)?.push({ filePath: file.fsPath, line: index });
-            }
-        });
-    }
+            });
+        })
+    );
+
+    return localizationKeys;
 }
 
 async function findUsedLocalizationKeys(keys: string[]): Promise<string[]> {
-    const usedKeys: string[] = [];
+    const usedKeys = new Set<string>();
     const files = await vscode.workspace.findFiles("**/*.dart");
 
-    for (const file of files) {
-        const document = await vscode.workspace.openTextDocument(file);
-        const text = document.getText();
+    const regexMap = new Map<string, RegExp>();
+    keys.forEach(key => regexMap.set(key, new RegExp(`\\.${key}\\b`, "g")));
 
-        for (const key of keys) {
-            const regex = new RegExp(`\\.${key}`, "g");
-            if (regex.test(text)) {
-                usedKeys.push(key);
+    await Promise.all(
+        files.map(async file => {
+            const textBytes = await vscode.workspace.fs.readFile(file);
+            const text = new TextDecoder("utf-8").decode(textBytes);
+
+            for (const [key, regex] of regexMap) {
+                if (regex.test(text)) {
+                    usedKeys.add(key);
+                }
             }
-        }
-    }
+        })
+    );
 
-    return usedKeys;
+    return [...usedKeys];
 }
