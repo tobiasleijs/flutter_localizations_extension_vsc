@@ -1,12 +1,10 @@
 import * as vscode from "vscode";
 import * as fs from "fs";
-import * as path from "path";
-import { preQueryCheck, formatLocalizationFile } from "../localization_generation/localization_generation";
+import { formatLocalizationFile } from "../localization_generation/localization_generation";
 
 export const localizationSorterProvider = vscode.commands.registerCommand("flutter_localizations.sortLocalizations", async () => {
     try {
-        const result = preQueryCheck();
-        sortLocalizations(result.languages);
+        sortLocalizations();
 
     } catch (error) {
         vscode.window.showErrorMessage((error as Error).message);
@@ -15,43 +13,54 @@ export const localizationSorterProvider = vscode.commands.registerCommand("flutt
 });
 
 
-export function sortLocalizations(languages: string[]) {
-    const rootFolder = vscode.workspace.workspaceFolders![0].uri.fsPath;
-    const localizationsFolder = path.join(rootFolder, "lib/src/localization");
+export async function sortLocalizations() {
+    const files = await vscode.workspace.findFiles("**/*.arb");
 
-    for (const language of languages) {
-        const localizationMap: { [key: string]: string } = JSON.parse(fs.readFileSync(path.join(localizationsFolder, language), "utf-8"));
-        const sectionsMap = new Map<string, Map<string, string>>();
+    for (const file of files) {
+        console.log(`Sorting: ${file.fsPath}`);
+
+        const localizationMap: { [key: string]: any } = JSON.parse(fs.readFileSync(file.fsPath, "utf-8"));
+
+        const sections: Map<string, Map<string, string>> = new Map();
+        const metadataEntries: Map<string, any> = new Map();
         let currentSection = "";
 
-        for (const key in localizationMap) {
-            const value = localizationMap[key];
+        for (const [key, value] of Object.entries(localizationMap)) {
             if (key.startsWith("@_")) {
                 currentSection = key;
-                sectionsMap.set(currentSection, new Map<string, string>());
+                sections.set(currentSection, new Map());
+            } else if (key.startsWith("@")) {
+                metadataEntries.set(key.substring(1), { metaKey: key, metaValue: value });
             } else {
-                sectionsMap.get(currentSection)?.set(key, value);
+                if (!sections.has(currentSection)) {
+                    sections.set(currentSection, new Map());
+                }
+                sections.get(currentSection)?.set(key, value);
             }
         }
 
-        const sortedSectionsMap = new Map([...sectionsMap.entries()].sort());
-        for (const section of sortedSectionsMap) {
-            const sortedSection = new Map([...section[1].entries()].sort());
-            sortedSectionsMap.set(section[0], sortedSection);
-        }
+        const sortedSections = new Map([...sections.entries()].sort());
+
+        sortedSections.forEach((sectionMap, sectionKey) => {
+            sortedSections.set(sectionKey, new Map([...sectionMap.entries()].sort()));
+        });
 
         const sortedLocalizationMap: { [key: string]: any } = {};
-        for (const [sectionKey, sectionMap] of sortedSectionsMap) {
+        for (const [sectionKey, sectionMap] of sortedSections) {
             sortedLocalizationMap[sectionKey] = {};
-            
             for (const [key, value] of sectionMap) {
                 sortedLocalizationMap[key] = value;
+
+                if (metadataEntries.has(key)) {
+                    const { metaKey, metaValue } = metadataEntries.get(key)!;
+                    sortedLocalizationMap[metaKey] = metaValue;
+                }
             }
         }
 
         const localizationFile = JSON.stringify(sortedLocalizationMap, null, 2);
         const sortedLocalizationFile = formatLocalizationFile(localizationFile);
 
-        fs.writeFileSync(path.join(localizationsFolder, language), sortedLocalizationFile);
+        fs.writeFileSync(file.fsPath, sortedLocalizationFile);
     }
 }

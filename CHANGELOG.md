@@ -2,6 +2,14 @@
 
 All notable changes to the "flutter-localizations" extension will be documented in this file.
 
+## [0.5.0] - 2025-03-3
+
+### Added
+
+- Added quick fix that delete single unused localizations
+- Added quick fix that deletes all unused localizations in a folder
+
+
 ## [0.4.0] - 2025-02-16
 
 ### Added

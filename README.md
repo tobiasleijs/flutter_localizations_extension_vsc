@@ -43,9 +43,11 @@ The extension provides a command to search for localization keys and values in y
 The extension will search for the specified key or value in your localization files and Dart files, and display the results.
 
 
-### Unused Localization Diagnostics
+### Unused Localization Diagnostics & Code Actions
 
 The extension automatically diagnoses and highlights unused localization keys in your Flutter project. It helps you identify and clean up localization keys that are no longer used in your codebase.
+
+When activating the code actions for a diagnostic, there will be two options. The first option will remove the selected localization, the second option will remove all unused localizations from the file.
 
 #### How It Works
 

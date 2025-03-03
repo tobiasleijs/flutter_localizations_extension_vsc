@@ -5,57 +5,81 @@ import { decapitalizeFirstChar } from "../../util/helpers";
 
 export const localizationGenerationProvider = vscode.commands.registerCommand("flutter_localizations.createLocalization", async () => {
     try {
-        const preQueryCheckResult = preQueryCheck();
+        const localizationFolders = await getLocalizationFolders();
 
-        const queryResult = await queryUser(
-            preQueryCheckResult.languages,
-            preQueryCheckResult.localizationMap,
+        let localizationFolder = localizationFolders[0];
+        if (localizationFolders.length > 1) {
+            localizationFolder = await askUserForLocalizationFolder(localizationFolders);
+        }
+
+        const preQueryCheckResult = checkForExistingLanuages(localizationFolder);
+
+        const queryResult = await queryUser(preQueryCheckResult
         );
 
         addAndSaveLocalizations(
-            preQueryCheckResult.localizationMap,
-            preQueryCheckResult.localizationsFolder,
+            preQueryCheckResult,
+            localizationFolder,
             queryResult.section,
             queryResult.translations,
             queryResult.localizationName,
             queryResult.isNewSection,
         );
 
-        generateFlutterLocalizations();
+        generateFlutterLocalizations(localizationFolder);
 
     } catch (error) {
         vscode.window.showErrorMessage((error as Error).message);
     }
 });
 
-export function preQueryCheck() {
-    const rootFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-    if (!rootFolder) {
-        throw new Error("Workspace folder not found");
-    }
-
-    const localizationsFolder = path.join(rootFolder, "lib/src/localization");
+export function checkForExistingLanuages(localizationsFolder: string) {
     const languages = getLanguages(localizationsFolder);
 
     if (languages.length === 0) {
         throw new Error("No languages found in the localization folder");
     }
 
-    const localizationMap: Map<string, string> = JSON.parse(fs.readFileSync(path.join(localizationsFolder, languages[0]), "utf-8"));
+    const localizationMaps: Map<string, Map<string, string>> = new Map();
 
-    if (!localizationMap) {
-        throw new Error("Couldn't read the localization file because it's not formatted correctly");
+    for (const language of languages) {
+        const localizationMap = JSON.parse(fs.readFileSync(path.join(localizationsFolder, language), "utf-8"));
+        if (!localizationMap) {
+            throw new Error("Couldn't read the localization file because it's not formatted correctly");
+        }
+        localizationMaps.set(language, localizationMap);
     }
 
-    return { localizationsFolder, languages, localizationMap };
+    return localizationMaps;
 }
 
-async function queryUser(languages: string[], localizationMap: Map<string, string>) {
-    const localizationName = await askForLocalizationName(localizationMap);
-    const sectionResult = await askForSection(localizationMap);
+async function askUserForLocalizationFolder(localizationFolders: string[]) {
+
+    const relativeFolders = localizationFolders.map(folder => path.relative(vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || "", folder));
+    const localizationFolder = await vscode.window.showQuickPick(relativeFolders, { placeHolder: "There are multiple folders with localization in this project, pick one" });
+    if (!localizationFolder) {
+        throw new Error("Localization folder is required");
+    }
+    return path.join(vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || "", localizationFolder);
+}
+
+async function getLocalizationFolders(): Promise<string[]> {
+    const arbFiles = await vscode.workspace.findFiles("**/*.arb");
+    if (!arbFiles || arbFiles.length === 0) {
+        throw new Error("No localization files found");
+    }
+    const folders = arbFiles.map(file => path.dirname(file.fsPath));
+    const uniqueFolders = [...new Set(folders)];
+    return uniqueFolders;
+}
+
+async function queryUser(localizationMaps: Map<string, Map<string, string>>) {
+    const firstLanguage = Array.from(localizationMaps.keys())[0];
+    const localizationName = await askForLocalizationName(localizationMaps.get(firstLanguage)!);
+    const sectionResult = await askForSection(localizationMaps.get(firstLanguage)!);
     const section = sectionResult.section;
     const isNewSection = sectionResult.isNewSection;
-    const translations = await askForTranslations(languages);
+    const translations = await askForTranslations(Array.from(localizationMaps.keys()));
 
     return { localizationName, section, isNewSection, translations };
 }
@@ -141,14 +165,14 @@ function getLanguages(localizationPath: string): string[] {
 
 
 function addAndSaveLocalizations(
-    localizationMap: { [key: string]: any },
+    localizationMaps: { [key: string]: any },
     localizationsFolder: string, section: string,
     translations: Map<string, string>,
     localizationName: string,
     isNewSection: boolean,
 ) {
     for (const [language, translation] of translations) {
-        const entries = Object.entries(localizationMap);
+        const entries = Object.entries(localizationMaps.get(language));
 
         if (isNewSection) {
             entries.push([`@_${section}`, {}]);
@@ -198,13 +222,51 @@ function localizationAlreadyExists(localizationMap: { [key: string]: any }, loca
     return Object.keys(localizationMap).includes(localizationName);
 }
 
-function generateFlutterLocalizations() {
+function generateFlutterLocalizations(localizationFolder: string) {
+    const pubspecPath = findPubspecPath(localizationFolder);
+
+    if (!pubspecPath) {
+        return;
+    }
+
     const task = new vscode.Task(
-        { type: 'shell' },
+        { type: "shell" },
         vscode.TaskScope.Workspace,
-        'Flutter Gen L10n',
-        'flutter',
-        new vscode.ShellExecution('flutter gen-l10n')
+        "Flutter Gen L10n",
+        "flutter",
+        new vscode.ShellExecution("flutter gen-l10n", { cwd: path.dirname(pubspecPath) })
     );
+
+    console.log("Running flutter gen-l10n from", path.dirname(pubspecPath));
+
     vscode.tasks.executeTask(task);
 }
+
+function findPubspecPath(startDir: string): string | null {
+    const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    if (!workspaceRoot) {
+        vscode.window.showErrorMessage("No workspace folder found.");
+        return null;
+    }
+
+    let currentDir = startDir;
+
+    while (true) {
+        const pubspecPath = path.join(currentDir, "pubspec.yaml");
+
+        if (fs.existsSync(pubspecPath)) {
+            return pubspecPath;
+        }
+
+        const parentDir = path.dirname(currentDir);
+
+        if (parentDir === currentDir || parentDir === workspaceRoot) {
+            break;
+        }
+
+        currentDir = parentDir;
+    }
+
+    return null;
+}
+
