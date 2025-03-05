@@ -1,8 +1,10 @@
 {
   "name": "flutter-localizations",
   "displayName": "Flutter Localizations",
-  "description": "An extension that helps you order and generate new localizations for Flutter",
+  "publisher": "Iconica Development",
+  "description": "An extension that helps you manage localizations in Flutter projects.",
   "version": "0.5.0",
+  "icon": "assets/flutter.png",
   "engines": {
     "vscode": "^1.97.0"
   },

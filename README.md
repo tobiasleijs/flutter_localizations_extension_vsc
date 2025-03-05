@@ -2,6 +2,17 @@
 
 This Visual Studio Code extension helps you manage and generate localizations for your Flutter applications.
 
+## How to install
+1. Run `npm install`  to install all libraries in the project.
+1. Install the package vsce, for macos users this means running the command `brew install vsce`.
+1. In the root of the folder run the command `vsce package`, enter 'y' for all the prompts.
+1. Go to the Extensions view.
+1. Select the three vertical dots icon in the upper right corner.
+1. Select Install from VSIX...
+1. Select the extension that you packaged in step 3, which should be in the root of your repository.
+
+
+
 ## Features
 
 ### Localization Generation
